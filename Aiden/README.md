@@ -146,52 +146,6 @@ Example test event:
 }
 ```
 
-## GitHub Project Board
-
-### User Stories / Backlog
-
-- Monitor website health.
-- Automate website monitoring.
-- Visualise website health.
-- Detect website problems.
-- Document the project.
-
-### Features
-
-- AWS CDK Infrastructure
-- Lambda Web Health Application
-- Multiple Website Monitoring
-- CloudWatch Metrics
-- EventBridge Scheduling
-- CloudWatch Dashboard
-- CloudWatch Alarms
-
-### In Progress
-
-- Implement real website measurements.
-- Test monitoring and alarms.
-- Improve README and runbook.
-
-### In Review
-
-- Lambda testing
-- CloudWatch metrics verification
-- Dashboard verification
-- Alarm verification
-
-### Done
-
-- CDK setup
-- AWS account configuration
-- IAM role
-- Lambda function
-- WebHealth application
-- 3 website configuration
-- 3 CloudWatch metrics
-- EventBridge schedule
-- CloudWatch Dashboard
-- CloudWatch Alarms
-
 ## Current Status
 
 The core AWS monitoring infrastructure has been implemented.
