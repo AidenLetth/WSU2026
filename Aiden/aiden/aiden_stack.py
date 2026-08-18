@@ -35,23 +35,19 @@ class AidenStack(Stack):
             handler="webhealth.lambda_handler",
             code=lambda_.Code.from_asset("./resources"),
             role=user_role,
-            timeout=Duration.seconds(30)
+            timeout=Duration.seconds(30) #if the function takes longer than 30 seconds, it will timeout
         )
 
         fn.apply_removal_policy(RemovalPolicy.DESTROY)
-
-        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events/Schedule.html#aws_cdk.aws_events.Schedule
-        #Create a schedule to trigger the Lambda function
-        schedule = events_.Schedule.rate(Duration.minutes(1))
-
-         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events_targets/LambdaFunction.html#aws_cdk.aws_events_targets.LambdaFunction
-         #Create a target for the Lambda function
-        target = targets_.LambdaFunction(fn)
-        
+    
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events/Schedule.html#aws_cdk.aws_events.Schedule
         #Create a rule to trigger the Lambda function on a schedule
         rule = events_.Rule(self, "Rule",
-            schedule=events_.Schedule.rate(Duration.minutes(1)),
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events/Schedule.html#aws_cdk.aws_events.Schedule
+        #Create a schedule to trigger the Lambda function
+            schedule=events_.Schedule.rate(Duration.minutes(5)),
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events_targets/LambdaFunction.html#aws_cdk.aws_events_targets.LambdaFunction
+        #Create a target for the Lambda function
             targets=[targets_.LambdaFunction(fn)]
         )
         rule.apply_removal_policy(RemovalPolicy.DESTROY)
@@ -64,14 +60,13 @@ class AidenStack(Stack):
             "WebHealthDashboard",
             dashboard_name="WebHealthDashboard"
         )
-
         #Define metrics 
         latencyMetric = {}
         availabilityMetric = {}
-        statusCodeMetric = {}
+        responseSizeMetric = {}
 
         #http ://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudwatch/Metric.html#aws_cdk.aws_cloudwatch.Metric
-        #Cloudwatch latency, availability and status code metric
+        #Cloudwatch latency, availability and response size metric
         for website in constants.WEBSITES:
             latencyMetric[website] = cw.Metric(
                 namespace=constants.namespace,
@@ -88,9 +83,9 @@ class AidenStack(Stack):
                 "Website": website
             },
             )
-            statusCodeMetric[website] = cw.Metric(
+            responseSizeMetric[website] = cw.Metric(
             namespace=constants.namespace,
-            metric_name=constants.metricStatusCode,
+            metric_name=constants.metricResponseSize,
             dimensions_map={
                 "Website": website
             },
@@ -103,11 +98,10 @@ class AidenStack(Stack):
                 cw.GraphWidget(
                     title= website,
                     left=[availabilityMetric[website],
-                          latencyMetric[website],
-                          statusCodeMetric[website]
-                    ],
-                    width = 12,
-                    height = 6
+                          latencyMetric[website],],
+                    right=[responseSizeMetric[website]],
+                    width=12,
+                    height=6
                 )
                 )
 
@@ -131,9 +125,9 @@ class AidenStack(Stack):
                  )
                 cw.Alarm(
                 self,
-                f"StatusCodeAlarm-{website}",
-                metric=statusCodeMetric[website],
-                threshold=400,
+                f"ResponseSizeAlarm-{website}",
+                metric=responseSizeMetric[website],
+                threshold=150,
                 evaluation_periods=1,
                 comparison_operator=cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
                 )

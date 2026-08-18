@@ -5,6 +5,6 @@ WEBSITES = [
 ]
 namespace='Aiden' 
 
-metricAvailability ='Availability'
-metricLatency ='Latency'
-metricStatusCode ='StatusCode'
+metricAvailability ='Availability' # The availability of the website
+metricLatency ='Latency' # The latency of the website
+metricResponseSize ='ResponseSize' # The size of the response in bytes
