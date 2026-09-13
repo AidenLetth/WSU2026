@@ -1,27 +1,22 @@
 # Aiden Web Health Monitoring
 
-This project uses AWS CDK, AWS Lambda, EventBridge, and CloudWatch to monitor the health and performance of multiple websites.
+Aiden Web Health Monitoring is an AWS CDK project that monitors the health and performance of multiple websites.
+
+The application uses AWS Lambda to send real HTTP requests to each configured website, collect website health metrics, publish the metrics to Amazon CloudWatch, display them on a CloudWatch Dashboard, and evaluate CloudWatch Alarms.
 
 ## Project Objectives
 
-- Monitor multiple websites.
-- Measure availability, latency, and HTTP status code.
-- Publish metrics to CloudWatch.
-- Create a CloudWatch Dashboard.
-- Configure CloudWatch Alarms.
-- Automate monitoring using EventBridge.
-- Manage documentation using Markdown and GitHub.
+- Monitor multiple websites automatically.
+- Collect real Availability values.
+- Measure real Latency values.
+- Measure real Response Size values.
+- Publish custom metrics to Amazon CloudWatch.
+- Display website health data on a CloudWatch Dashboard.
+- Configure CloudWatch Alarms for abnormal metric values.
+- Use Amazon SNS for alarm notifications.
+- Log alarm notifications in Amazon DynamoDB.
+- Maintain project documentation and the GitHub Project board.
 
-## Technologies
-
-| Technology | Purpose |
-| ----------- | ----------- |
-| Python | Application development |
-| AWS CDK | Infrastructure as Code |
-| AWS Lambda | Web health monitoring |
-| EventBridge | Schedule Lambda execution |
-| CloudWatch | Metrics, Dashboard and Alarms |
-| GitHub | Version control and project management |
 
 ## Monitored Websites
 
@@ -29,13 +24,15 @@ This project uses AWS CDK, AWS Lambda, EventBridge, and CloudWatch to monitor th
 2. https://www.google.com
 3. https://www.westernsydney.edu.au
 
+The website list is defined in resources/constants.py.
+
 ## Metrics
 
-| Metric | Description |
-| ----------- | ----------- |
-| Availability | Indicates whether the website is available |
-| Latency | Measures website response time |
-| Status Code | Records the HTTP response code |
+| Metric | Description | Unit / Value
+| ----------- | ----------- | -----------
+| Availability | Shows whether a website request succeeds | 1 = available, 0 = unavailable
+| Latency | Measures how long the website request takes | Seconds
+| Status Code | Measures the amount of response data returned by the website | Bytes
 
 The project monitors:
 
@@ -49,6 +46,7 @@ Aiden/
 │   ├── __init__.py
 │   └── aiden_stack.py
 ├── resources/
+│   ├── alarm.py
 │   ├── constants.py
 │   ├── CWdata.py
 │   └── webhealth.py
@@ -61,97 +59,274 @@ Aiden/
 ## Architecture
 
 ```text
-EventBridge
-     |
-     v
-AWS Lambda
-     |
-     v
-CloudWatch
-  /       \
-Dashboard  Alarms
+Amazon EventBridge
+        |
+        | Scheduled trigger
+        v
+AWS Lambda - Web Health
+        |
+        | HTTP requests
+        v
+Monitored Websites
+        |
+        | Availability / Latency / Response Size
+        v
+Amazon CloudWatch
+     /           \
+Dashboard       Alarms
+                   |
+                   v
+              Amazon SNS
+              /        \
+         Email       Alarm Logger
+                         |
+                         v
+                    DynamoDB
 ```
 
-## Lambda Function
+## Main Components
 
-The Lambda function is implemented in `webhealth.py`.
+### AWS CDK
 
-## EventBridge
+AWS CDK is used to define and deploy the AWS infrastructure as code.
 
-The Lambda function is automatically triggered every 1 minute.
+The main stack is:
 
-```python
-schedule=events_.Schedule.rate(Duration.minutes(1))
-```
+`AidenStack`
 
-## CloudWatch Dashboard
+The stack creates and configures the main AWS resources used by the project.
 
-A CloudWatch Dashboard named `WebHealthDashboard` was created.
+### AWS Lambda
 
-The dashboard displays:
+The Web Health Lambda function is defined in:
+
+`resources/webhealth.py`
+
+It loops through the configured websites and performs a real HTTP request for each website.
+
+For each request, the function collects:
 
 - Availability
 - Latency
-- Status Code
+- Response Size
 
-for each monitored website.
+### Amazon EventBridge
+
+EventBridge automatically triggers the Web Health Lambda on a schedule.
+
+The current monitoring schedule is:
+
+`Every 5 minutes`
+
+### Amazon CloudWatch
+
+CloudWatch is used to:
+
+- Store custom Web Health metrics.
+- Display metrics on `WebHealthDashboard`.
+- Evaluate metric thresholds using CloudWatch Alarms.
+- Store Lambda execution logs.
+
+### Amazon SNS
+
+Amazon SNS is used to publish notifications when CloudWatch Alarm thresholds are breached.
+
+SNS can notify subscribers such as an email subscription and can also trigger the alarm logging workflow.
+
+### Amazon DynamoDB
+
+DynamoDB is used to store alarm notification information so that alarm events can be reviewed later.
+
+---
+
+## Real Website Health Collection
+
+The Web Health Lambda sends an HTTP request to each configured website.
+This produces real metric values for each monitoring run.
+
+---
+
+## CloudWatch Metric Publishing
+
+Metric publishing is handled by:
+
+`resources/CWdata.py`
+
+Each website is sent to CloudWatch as an individual `Website` dimension.
+The custom CloudWatch namespace is:
+
+`Aiden`
+
+---
+
+## CloudWatch Dashboard
+
+The project creates a CloudWatch Dashboard named:
+
+`WebHealthDashboard`
+
+The dashboard contains one graph for each monitored website.
+
+Each graph displays:
+
+- Availability
+- Latency
+- Response Size
+
+This allows the health of all monitored websites to be reviewed from a single dashboard.
+
+---
 
 ## CloudWatch Alarms
+
+CloudWatch Alarms evaluate the website metrics against configured thresholds.
 
 The project includes alarms for:
 
 - Availability
 - Latency
-- Status Code
+- Response Size
 
-Example thresholds:
+Alarm thresholds should be reviewed after observing real website values because real latency and response size can vary between websites.
 
-| Alarm | Threshold |
-| ----------- | ----------- |
-| Availability | < 1 |
-| Latency | > 0.23 |
-| Status Code | >= 400 |
+---
 
-## AWS CDK Commands
+## SNS Alarm Notifications
 
-### Synth
+When a CloudWatch Alarm enters the `ALARM` state, Amazon SNS is used to publish an alarm notification.
+
+The notification workflow is:
+
+```text
+CloudWatch Alarm
+        |
+        v
+Amazon SNS
+     /      \
+ Email    Alarm Logger
+```
+
+Email subscriptions must be confirmed before notification emails can be received.
+
+---
+
+## DynamoDB Alarm Logging
+
+Alarm notifications can be logged in DynamoDB through the alarm logging Lambda.
+
+The alarm log can contain information such as:
+
+- Alarm name
+- Alarm state
+- Alarm reason
+- Timestamp
+- Alarm identifier
+
+This provides a historical record of alarm events.
+
+---
+
+## Deployment
+
+Activate the Python virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+Install dependencies if required:
+
+```bash
+pip install -r requirements.txt
+```
+
+Check the CDK template:
 
 ```bash
 cdk synth
 ```
 
-### Deploy
+Deploy the stack:
 
 ```bash
 cdk deploy
 ```
 
-### Destroy
-
-```bash
-cdk destroy
-```
+---
 
 ## Testing
 
-Lambda can be tested using the AWS Lambda Console.
+### Test the Web Health Lambda
 
-Example test event:
+1. Open AWS Lambda.
+2. Select the Web Health Lambda function.
+3. Create or select a test event.
+4. Run the test.
+5. Check the execution result and CloudWatch Logs.
 
-```json
-{
-  "key1": "value1",
-  "key2": "value2",
-  "key3": "value3"
-}
+A successful run should process all three websites.
+
+Example output:
+
+```text
+Website: https://www.ralphlauren.com | Availability: 1 | Latency: ... | Response Size: ... bytes
+Website: https://www.google.com | Availability: 1 | Latency: ... | Response Size: ... bytes
+Website: https://www.westernsydney.edu.au | Availability: 1 | Latency: ... | Response Size: ... bytes
 ```
 
-## Current Status
+### Verify CloudWatch Metrics
 
-The core AWS monitoring infrastructure has been implemented.
+Open:
 
-The next step is to replace the current test values with real website measurements.
+`CloudWatch -> Metrics -> Aiden`
+
+Check that each website has values for:
+
+- Availability
+- Latency
+- Response Size
+
+### Verify the Dashboard
+
+Open:
+
+`CloudWatch -> Dashboards -> WebHealthDashboard`
+
+Confirm that all three website graphs update with current values.
+
+### Verify Alarms
+
+Open:
+
+`CloudWatch -> Alarms`
+
+Confirm that the alarm states match the current metric values and thresholds.
+
+### Verify SNS
+
+Trigger a threshold breach and confirm that the SNS notification is delivered to the configured subscriber.
+
+### Verify DynamoDB
+
+After an alarm notification is generated, open the DynamoDB alarm log table and confirm that the alarm record has been stored.
+
+---
+
+## GitHub Project Board
+
+The project board is organised into five workflow columns:
+
+1. User Stories / Backlog
+2. Features
+3. In Progress
+4. In Review
+5. Done
+
+The board is updated to reflect the current implementation, testing, and verification status of the Web Health project.
+
+---
 
 ## Author
 
 **Aiden**
+

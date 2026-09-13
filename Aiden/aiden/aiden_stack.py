@@ -10,6 +10,10 @@ from aws_cdk import (
     Duration,
     aws_iam as iam_,
     aws_cloudwatch as cw,
+    aws_sns as sns,
+    aws_sns_subscriptions as subscriptions,
+    aws_cloudwatch_actions as cw_actions,
+    aws_dynamodb as dynamodb
 )
 from constructs import Construct
 
@@ -52,7 +56,19 @@ class AidenStack(Stack):
         )
         rule.apply_removal_policy(RemovalPolicy.DESTROY)
 
-        
+
+        #Create an SNS topic
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_sns/Topic.html#aws_cdk.aws_sns.Topic
+        alarm_topic = sns.Topic(
+            self,
+            "WHAlarmTopic",
+            display_name="WHAlarm Notifications",
+        )
+
+        #An email subscription to SNS to receive notifications 
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_sns_subscriptions/EmailSubscription.html#aws_cdk.aws_sns_subscriptions.EmailSubscription
+        alarm_topic.add_subscription(subscriptions.EmailSubscription("janpan269@gmail.com"))
+
         #Push Cloudwatch dashboard (just name without any widgets)
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudwatch/Dashboard.html#aws_cdk.aws_cloudwatch.Dashboard
         dashboard = cw.Dashboard(
@@ -107,7 +123,7 @@ class AidenStack(Stack):
 
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudwatch/Alarm.html#aws_cdk.aws_cloudwatch.Alarm
         #Set an alarm for availability,latency and status code metrics
-                cw.Alarm(
+                availabilityAlarm = cw.Alarm(
                 self,
                 f"AvailabilityAlarm-{website}",
                 metric=availabilityMetric[website],
@@ -115,7 +131,11 @@ class AidenStack(Stack):
                 evaluation_periods=1,
                 comparison_operator=cw.ComparisonOperator.LESS_THAN_THRESHOLD,
                 )
-                cw.Alarm(
+                #Add an action to alarm to send a notifiaction
+                #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudwatch_actions/SnsAction.html#aws_cdk.aws_cloudwatch_actions.SnsAction
+                availabilityAlarm.add_alarm_action(cw_actions.SnsAction(alarm_topic))
+
+                latencyAlarm = cw.Alarm(
                 self,
                 f"LatencyAlarm-{website}",
                 metric=latencyMetric[website],
@@ -123,7 +143,8 @@ class AidenStack(Stack):
                 evaluation_periods=1,
                 comparison_operator=cw.ComparisonOperator.GREATER_THAN_THRESHOLD,
                  )
-                cw.Alarm(
+                latencyAlarm.add_alarm_action(cw_actions.SnsAction(alarm_topic))
+                responseSizeAlarm = cw.Alarm(
                 self,
                 f"ResponseSizeAlarm-{website}",
                 metric=responseSizeMetric[website],
@@ -131,6 +152,40 @@ class AidenStack(Stack):
                 evaluation_periods=1,
                 comparison_operator=cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
                 )
+                responseSizeAlarm.add_alarm_action(cw_actions.SnsAction(alarm_topic))
 
-       
-            
+        #Create a DynamoDB table to store alarm notifications 
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_dynamodb/Table.html#aws_cdk.aws_dynamodb.Table
+        table = dynamodb.Table(
+            self,
+            "AlarmNotificationsTable",
+            partition_key=dynamodb.Attribute(
+                name="alarm_id",
+                type=dynamodb.AttributeType.STRING
+            ),
+            sort_key=dynamodb.Attribute(
+                name="timestamp",
+                type=dynamodb.AttributeType.STRING
+            ),
+            removal_policy=RemovalPolicy.DESTROY
+        )
+
+        #Create Lambda logger (function) 
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html#aws_cdk.aws_lambda.Function
+        alarm_logger = lambda_.Function(
+            self,
+            "AlarmLogger",
+            runtime=lambda_.Runtime.PYTHON_3_13,
+            handler="alarm.lambda_handler",
+            code=lambda_.Code.from_asset("./resources"),
+            environment={
+                "DYNAMODB_TABLE_NAME": table.table_name
+            },
+            timeout=Duration.seconds(30), #(optional) but if the function takes longer than 30 seconds, it will timeout (lambda in aws)
+        )
+        #Grant the Lambda function permission to write to the DynamoDB table
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_dynamodb/Table.html#aws_cdk.aws_dynamodb.Table.grant_write_data
+        table.grant_write_data(alarm_logger)  
+
+        #Subscribe to receive notifications in the second way (Lambda function) when an alarm is triggered
+        alarm_topic.add_subscription(subscriptions.LambdaSubscription(alarm_logger))
