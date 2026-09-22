@@ -15,7 +15,7 @@ class AidenPipelineStack(Stack):
             repo_string="AidenLetth/WSU2026", 
             branch="main",
             authentication=SecretValue.secrets_manager("githubSecret"),
-            trigger=aws_codepipeline.CodePipelineTrigger.GITHUB("POLL")
+              trigger=pipeline_.GitHubTrigger.POLL
         )
 
         synth = pipeline_.ShellStep(
