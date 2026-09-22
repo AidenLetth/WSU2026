@@ -21,7 +21,7 @@ class AidenPipelineStack(Stack):
             input=source,
             commands=[
                 "npm install -g aws-cdk",
-                "cd Aiden/git",
+                "cd Aiden/",
                 "python -m pip install -r requirements.txt",
                 "cdk synth"
             ],
