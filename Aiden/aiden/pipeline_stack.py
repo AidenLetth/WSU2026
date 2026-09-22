@@ -4,6 +4,7 @@ from aws_cdk import (
     SecretValue
 )
 from constructs import Construct
+from .pipeline_stage import AidenPipelineStage
 
 
 class AidenPipelineStack(Stack):
@@ -33,3 +34,17 @@ class AidenPipelineStack(Stack):
             "AidenPipeline",
             synth=synth
         )
+        #Alpha 
+        AlphaStage = AidenPipelineStage( self, "UnitTestStage")
+        pipeline.add_stage (AlphaStage,
+                            pre=[pipeline_.ShellStep("UnitTestBlocker",
+                                 commands=[ "npm install -g aws-cdk",
+                                   "cd Aiden/",
+                                   "python -m pip install -r requirements.txt",
+                                   "python -m pip install pytest",
+                                   "python3 -m pytest"
+                                   ]
+        )
+                                ]
+                            )
+       
