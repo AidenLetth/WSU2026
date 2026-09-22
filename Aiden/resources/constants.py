@@ -1,5 +1,5 @@
 WEBSITES = [
-    "https://www.ralphlauren.com",
+    "https://www.ralphlauren.com.au",
     "https://www.google.com",
     "https://www.westernsydney.edu.au"
 ]

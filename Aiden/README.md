@@ -20,7 +20,7 @@ The application uses AWS Lambda to send real HTTP requests to each configured we
 
 ## Monitored Websites
 
-1. https://www.ralphlauren.com
+1. https://www.ralphlauren.com.au
 2. https://www.google.com
 3. https://www.westernsydney.edu.au
 

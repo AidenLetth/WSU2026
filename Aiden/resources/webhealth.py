@@ -15,13 +15,14 @@ def lambda_handler(event, context):
         responseSize = 0
         try:
             #Create a real HTTP request to the website and measure the response time and size
+            #https://docs.python.org/3/library/urllib.request.html#urllib.request.urlopen
             request = urllib.request.Request(
             website,
             headers={"User-Agent": "Mozilla/5.0 WebHealthMonitor"}
             )
 
             #Start measuring response time
-            start_time = time.perf_counter()
+            start_time = time.perf_counter() #time.perf_counter() is used to measure the time taken for the request to complete #https://docs.python.org/3/library/time.html#time.perf_counter
             with urllib.request.urlopen(request, timeout=10) as response:
                 #Read real websites 
                 data=response.read()
@@ -34,6 +35,7 @@ def lambda_handler(event, context):
 
                 #Real response size in bytes
                 responseSize = len(data)
+                
         except urllib.error.HTTPError as e:
             latency = (time.perf_counter() - start_time)
             availability = 0

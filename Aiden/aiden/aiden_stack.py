@@ -39,7 +39,7 @@ class AidenStack(Stack):
             handler="webhealth.lambda_handler",
             code=lambda_.Code.from_asset("./resources"),
             role=user_role,
-            timeout=Duration.seconds(30) #if the function takes longer than 30 seconds, it will timeout
+            timeout=Duration.seconds(30) #if the function takes longer than 30 seconds, it will timeout, when do test in AWS Lambda, it will fail if do not set this timeout to 30 seconds
         )
 
         fn.apply_removal_policy(RemovalPolicy.DESTROY)
@@ -57,7 +57,7 @@ class AidenStack(Stack):
         rule.apply_removal_policy(RemovalPolicy.DESTROY)
 
 
-        #Create an SNS topic
+        #Create an SNS topic (w6,7) to send notifications when an alarm is triggered
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_sns/Topic.html#aws_cdk.aws_sns.Topic
         alarm_topic = sns.Topic(
             self,
@@ -122,7 +122,7 @@ class AidenStack(Stack):
                 )
 
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_cloudwatch/Alarm.html#aws_cdk.aws_cloudwatch.Alarm
-        #Set an alarm for availability,latency and status code metrics
+        #Set an alarm for availability,latency and response size metrics
                 availabilityAlarm = cw.Alarm(
                 self,
                 f"AvailabilityAlarm-{website}",
@@ -163,14 +163,10 @@ class AidenStack(Stack):
                 name="alarm_id",
                 type=dynamodb.AttributeType.STRING
             ),
-            sort_key=dynamodb.Attribute(
-                name="timestamp",
-                type=dynamodb.AttributeType.STRING
-            ),
             removal_policy=RemovalPolicy.DESTROY
         )
 
-        #Create Lambda logger (function) 
+        #Create Lambda logger (function) (bridge between SNS and DynamoDB) to log alarm notifications to DynamoDB table
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Function.html#aws_cdk.aws_lambda.Function
         alarm_logger = lambda_.Function(
             self,
