@@ -1,7 +1,6 @@
 from aws_cdk import (
     Stack,
     pipelines as pipeline_,
-    aws_codepipeline as aws_codepipeline,
     SecretValue
 )
 from constructs import Construct
@@ -12,26 +11,25 @@ class AidenPipelineStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         source = pipeline_.CodePipelineSource.git_hub(
-            repo_string="AidenLetth/WSU2026", 
+            repo_string="AidenLetth/WSU2026",
             branch="main",
-            authentication=SecretValue.secrets_manager("githubSecret"),
-              trigger=pipeline_.GitHubTrigger.POLL
+            authentication=SecretValue.secrets_manager("githubSecret")
         )
 
         synth = pipeline_.ShellStep(
-            id="Synth",
+            "Synth",
             input=source,
             commands=[
                 "npm install -g aws-cdk",
-                "cd aiden/",
-                "pip install -r requirements.txt",
+                "cd Aiden/git",
+                "python -m pip install -r requirements.txt",
                 "cdk synth"
             ],
-            primary_output_directory="aiden/cdk.out"
+            primary_output_directory="Aiden/cdk.out"
         )
 
         pipeline = pipeline_.CodePipeline(
             self,
-            id="AidenPipeline",
-            synth=synth,
+            "AidenPipeline",
+            synth=synth
         )
