@@ -3,11 +3,11 @@ import os
 
 import aws_cdk as cdk
 
-from aiden.pipeline_stack import AidenPipelineStack
+from aiden.aiden_stack import AidenStack
 
 
 app = cdk.App()
-AidenPipelineStack(app, "AidenPipelineStack",
+AidenStack(app, "AidenStack",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.

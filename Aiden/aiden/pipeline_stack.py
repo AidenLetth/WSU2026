@@ -38,8 +38,8 @@ class AidenPipelineStack(Stack):
             "AidenPipeline",
             synth=synth
         )
-        #Alpha Stage is a stage that runs the unit tests for the CDK app, it is added to the pipeline after the synth step
-        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.pipelines/CodePipeline.html#aws_cdk.pipelines.CodePipeline.add_stage
+        # Alpha Stage runs unit tests for the web crawler before deployment, it is added to the pipeline after the synth step
+        # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.pipelines/CodePipeline.html#aws_cdk.pipelines.CodePipeline.add_stage
         AlphaStage = AidenPipelineStage( self, "UnitTestStage")
         pipeline.add_stage (AlphaStage,
                             pre=[pipeline_.ShellStep("UnitTestBlocker",
@@ -51,9 +51,21 @@ class AidenPipelineStack(Stack):
                                    ] )
                                 ]
                             )
-        #Beta Stage is a stage that runs the integration tests for the CDK app, it is added to the pipeline after the Alpha Stage
-        BetaStage = AidenPipelineStage( self, "IntegrationTestStage")
+        # Beta Stage runs functional tests for the web crawler before deployment
+        BetaStage = AidenPipelineStage( self, "FunctionalTestStage")
         pipeline.add_stage (BetaStage,
+                            pre=[pipeline_.ShellStep("FunctionalTestBlocker",
+                                 commands=[ "npm install -g aws-cdk",
+                                   "cd Aiden/",
+                                   "python -m pip install -r requirements.txt",
+                                   "python -m pip install pytest",
+                                   "python3 -m pytest"
+                                   ] )
+                                ]
+                            )
+        # Gamma Stage runs integration tests for the web crawler before deployment
+        GammaStage = AidenPipelineStage( self, "IntegrationTestStage")
+        pipeline.add_stage (GammaStage,
                             pre=[pipeline_.ShellStep("IntegrationTestBlocker",
                                  commands=[ "npm install -g aws-cdk",
                                    "cd Aiden/",
