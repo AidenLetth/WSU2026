@@ -74,7 +74,6 @@ class AidenStack(Stack):
         dashboard = cw.Dashboard(
             self,
             "WebHealthDashboard",
-            dashboard_name="WebHealthDashboard"
         )
         #Define metrics 
         latencyMetric = {}
