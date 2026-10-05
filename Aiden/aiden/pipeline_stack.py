@@ -80,13 +80,9 @@ class AidenPipelineStack(Stack):
         ProdStage = AidenPipelineStage(self,"ProdStage")
         pipeline.add_stage(ProdStage,
                            pre=[
-                               pipeline_.ShellStep( "ProdTestBlocker",
-                                   commands=[
-                                       "cd Aiden/",
-                                       "python -m pip install -r requirements.txt",
-                                       "python -m pip install pytest",
-                                       "python3 -m pytest tests/ -v"
-                                   ]
-                               )
-                           ])
+                                pipeline_.ManualApprovalStep(
+                                    "ApproveProdDeployment"
+                                )
+                            ]
+                        )
 
