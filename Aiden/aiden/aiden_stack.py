@@ -75,7 +75,87 @@ class AidenStack(Stack):
             self,
             "WebHealthDashboard",
         )
-        #Define metrics 
+        #Monitor how often the crawler runs, how long and whether it fails
+
+        #how many times is the lambda crawler invoked
+        invocationMetric= fn.metric_invocations(
+             period=Duration.minutes(10),
+             statistic="Sum"
+        )
+
+        #how long does the lambda crawler take to run
+        durationMetric= fn.metric_duration(
+            period=Duration.minutes(5),
+            statistic ="Maximum" #timeout is 30 seconds, so if the crawler takes longer than 20 seconds, it will timeout and fail
+        )
+        #how many times does the lambda crawler fail
+        errorMetric= fn.metric_errors(
+            period=Duration.minutes(5),
+            statistic="Sum"
+        )
+         # add Lambda operational metrics to the dashboard
+        dashboard.add_widgets(
+            cw.GraphWidget(
+                title="Web Crawler Operational Health",
+                left=[
+                    invocationMetric,
+                    errorMetric
+                ],
+                right=[
+                    durationMetric
+                ],
+                width=12,
+                height=6
+            )
+        )
+
+        
+
+        # Alarm if the scheduled crawler does not run
+        lambda_invocation_alarm = cw.Alarm(
+            self,
+            "LambdaInvocationAlarm",
+            metric=invocationMetric,
+            threshold=1,
+            evaluation_periods=1,
+            comparison_operator=
+                cw.ComparisonOperator.LESS_THAN_THRESHOLD,
+            treat_missing_data=cw.TreatMissingData.BREACHING
+        )
+        # Alarm if one crawler run takes more than 20 seconds
+        lambda_duration_alarm = cw.Alarm(
+            self,
+            "LambdaDurationAlarm",
+            metric=durationMetric,
+            threshold=20000, # 20 seconds in milliseconds
+            evaluation_periods=1,
+            comparison_operator=
+                cw.ComparisonOperator.GREATER_THAN_THRESHOLD
+        )
+
+        # Alarm if Lambda reports an execution error
+        lambda_error_alarm = cw.Alarm(
+            self,
+            "LambdaErrorAlarm",
+            metric=errorMetric,
+            threshold=1, # 1 error
+            evaluation_periods=1,
+            comparison_operator=
+                cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
+        )
+
+        # Send operational alarms to the existing SNS topic
+        operational_alarms = [
+            lambda_error_alarm,
+            lambda_duration_alarm,
+            lambda_invocation_alarm
+        ]
+
+        for alarm in operational_alarms:
+            alarm.add_alarm_action(
+                cw_actions.SnsAction(alarm_topic)
+            )
+        #Define metrics
         latencyMetric = {}
         availabilityMetric = {}
         responseSizeMetric = {}
