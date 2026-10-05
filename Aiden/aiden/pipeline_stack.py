@@ -38,7 +38,7 @@ class AidenPipelineStack(Stack):
             "AidenPipeline",
             synth=synth
         )
-        # Alpha Stage runs unit tests for the web crawler before deployment, it is added to the pipeline after the synth step
+        # Alpha Stage runs unit tests for the web crawler before deployment
         # https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.pipelines/CodePipeline.html#aws_cdk.pipelines.CodePipeline.add_stage
         AlphaStage = AidenPipelineStage( self, "UnitTestStage")
         pipeline.add_stage (AlphaStage,
@@ -47,7 +47,7 @@ class AidenPipelineStack(Stack):
                                    "cd Aiden/",
                                    "python -m pip install -r requirements.txt",
                                    "python -m pip install pytest",
-                                   "python3 -m pytest"
+                                   "python3 -m pytest tests/unit/ -v"
                                    ] )
                                 ]
                             )
@@ -59,7 +59,7 @@ class AidenPipelineStack(Stack):
                                    "cd Aiden/",
                                    "python -m pip install -r requirements.txt",
                                    "python -m pip install pytest",
-                                   "python3 -m pytest"
+                                   "python3 -m pytest tests/functional/ -v"
                                    ] )
                                 ]
                             )
@@ -71,7 +71,22 @@ class AidenPipelineStack(Stack):
                                    "cd Aiden/",
                                    "python -m pip install -r requirements.txt",
                                    "python -m pip install pytest",
-                                   "python3 -m pytest"
+                                   "python3 -m pytest tests/integration/ -v"
                                    ] )
                                 ]
                             )
+        
+        #Prod Stage
+        ProdStage = AidenPipelineStage(self,"ProdStage")
+        pipeline.add_stage(ProdStage,
+                           pre=[
+                               pipeline_.ShellStep( "ProdTestBlocker",
+                                   commands=[
+                                       "cd Aiden/",
+                                       "python -m pip install -r requirements.txt",
+                                       "python -m pip install pytest",
+                                       "python3 -m pytest tests/ -v"
+                                   ]
+                               )
+                           ])
+
