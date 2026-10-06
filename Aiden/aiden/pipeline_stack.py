@@ -75,8 +75,8 @@ class AidenPipelineStack(Stack):
                                    ] )
                                 ]
                             )
-        
-        #Prod Stage
+
+        #Prod Stage: Manual approval before deployment
         ProdStage = AidenPipelineStage(self,"ProdStage")
         pipeline.add_stage(ProdStage,
                            pre=[

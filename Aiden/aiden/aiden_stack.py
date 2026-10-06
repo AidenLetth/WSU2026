@@ -13,7 +13,8 @@ from aws_cdk import (
     aws_sns as sns,
     aws_sns_subscriptions as subscriptions,
     aws_cloudwatch_actions as cw_actions,
-    aws_dynamodb as dynamodb
+    aws_dynamodb as dynamodb,       
+    aws_codedeploy as codedeploy
 )
 from constructs import Construct
 
@@ -44,6 +45,16 @@ class AidenStack(Stack):
 
         fn.apply_removal_policy(RemovalPolicy.DESTROY)
     
+        #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Version.html#aws_cdk.aws_lambda.Version
+        #create a version of the current lambda
+        current_version = fn.current_version
+        #Create an alias that points to the current version of the Lambda function
+        live_alias = lambda_.Alias(
+            self,
+            "LiveAlias",
+            alias_name="live",
+            version=current_version
+        )
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events/Schedule.html#aws_cdk.aws_events.Schedule
         #Create a rule to trigger the Lambda function on a schedule
         rule = events_.Rule(self, "Rule",
@@ -52,7 +63,7 @@ class AidenStack(Stack):
             schedule=events_.Schedule.rate(Duration.minutes(5)),
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_events_targets/LambdaFunction.html#aws_cdk.aws_events_targets.LambdaFunction
         #Create a target for the Lambda function
-            targets=[targets_.LambdaFunction(fn)]
+            targets=[targets_.LambdaFunction(live_alias)]
         )
         rule.apply_removal_policy(RemovalPolicy.DESTROY)
 
@@ -110,7 +121,6 @@ class AidenStack(Stack):
         )
 
         
-
         # Alarm if the scheduled crawler does not run
         lambda_invocation_alarm = cw.Alarm(
             self,
@@ -155,6 +165,23 @@ class AidenStack(Stack):
             alarm.add_alarm_action(
                 cw_actions.SnsAction(alarm_topic)
             )
+        #canary deployment with automatic rollback if the new version of the Lambda function fails
+         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_codedeploy/AutoRollbackConfig.html#aws_cdk.aws_codedeploy.AutoRollbackConfig
+        deployment_group = codedeploy.LambdaDeploymentGroup(
+            self,
+            "WebCrawlerDeploymentGroup",
+            alias=live_alias,
+            deployment_config=codedeploy.LambdaDeploymentConfig.CANARY_10_PERCENT_5_MINUTES, # in the first 5 mins, deploy 10% of version 1, 90% of version 2, if OK, 100% of version 2 will be deployed, if not, rollback to version 1
+           #error and duration alarms will be used to monitor the new version of the Lambda function, invocation is not used a low invocation count may be caused by scheduling or traffic rather than a faulty deployment  
+            alarms=[
+                lambda_error_alarm,
+                lambda_duration_alarm,],
+            #2 options for auto rollback: deployment_in_alarm and failed_deployment, rollback will be happened if any of the alarms are triggered or if the deployment fails
+            auto_rollback=codedeploy.AutoRollbackConfig(
+                deployment_in_alarm = True,
+                failed_deployment = True
+            )
+        )
         #Define metrics
         latencyMetric = {}
         availabilityMetric = {}
