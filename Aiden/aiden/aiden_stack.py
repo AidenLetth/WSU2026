@@ -14,7 +14,8 @@ from aws_cdk import (
     aws_sns_subscriptions as subscriptions,
     aws_cloudwatch_actions as cw_actions,
     aws_dynamodb as dynamodb,       
-    aws_codedeploy as codedeploy
+    aws_codedeploy as codedeploy,
+    aws_apigateway as apigateway
 )
 from constructs import Construct
 
@@ -31,6 +32,80 @@ class AidenStack(Stack):
         )
         user_role.apply_removal_policy(RemovalPolicy.DESTROY)
 
+        #AP-dynamoDB table for crawler targets
+        targets_table = dynamodb.Table(
+            self,
+            "TargetsTable",
+            partition_key=dynamodb.Attribute(
+                name="target_id", #target_id is the primary key, GET, PUT, DELETE 
+                type=dynamodb.AttributeType.STRING
+            ),
+            removal_policy=RemovalPolicy.DESTROY
+        )
+        #AP- CRUD lambda : create, read, update and delete
+        target_api_function= lambda_.Function(
+            self,
+            "TargetApiFunction",
+            runtime = lambda_.Runtime.PYTHON_3_13,
+            handler = "target_api.lambda_handler",
+            code=lambda_.Code.from_asset("./resources"),
+            timeout=Duration.seconds(30), 
+            environment = {
+                "TARGETS_TABLE_NAME": targets_table.table_name
+        })
+        
+        #allow crud lambda read and write
+        targets_table.grant_read_write_data(
+             target_api_function
+        )
+
+        #AP- public REST API Gateway: allows users to manage crawler targets
+        api = apigateway.RestApi(
+            self,
+            "WebCrawlerApi",
+            rest_api_name = "Web Crawler Target API",
+            description= (
+                 "Public REST API for managing "
+                 "web crawler targets"
+            )
+        )
+
+        #Connect API Gateway to the CRUD lambda
+        target_integration = apigateway.LambdaIntegration(
+            target_api_function 
+        )
+        
+        #targets
+        #POST (Create) and GET (Read)
+        targets_resource = api.root.add_resource(
+             "targets"
+        )
+        targets_resource.add_method(
+             "POST",
+             target_integration
+        )
+        targets_resource.add_method(
+             "GET",
+             target_integration
+        )
+
+        #/targets/{target_id}.   GET(READ), PUT(UPDATE), DELETE(DELETE)
+        target_resource = targets_resource.add_resource(
+             "{target_id}"
+        )
+        target_resource.add_method(
+             "GET",
+             target_integration
+        )
+        target_resource.add_method(
+             "PUT",
+             target_integration
+        )
+        target_resource.add_method(
+             "DELETE",
+             target_integration
+        )
+
         #http://docs.aws.amazon.com/cdk/api/v1/python/aws_cdk.aws_lambda/README.html
         #Created lambda function 
         fn = lambda_.Function(
@@ -40,10 +115,16 @@ class AidenStack(Stack):
             handler="webhealth.lambda_handler",
             code=lambda_.Code.from_asset("./resources"),
             role=user_role,
-            timeout=Duration.seconds(30) #if the function takes longer than 30 seconds, it will timeout, when do test in AWS Lambda, it will fail if do not set this timeout to 30 seconds
-        )
+            timeout=Duration.seconds(30), #if the function takes longer than 30 seconds, it will timeout, when do test in AWS Lambda, it will fail if do not set this timeout to 30 seconds
+            environment = {
+                "TARGETS_TABLE_NAME": targets_table.table_name
+            })
+
 
         fn.apply_removal_policy(RemovalPolicy.DESTROY)
+
+        #allow crawler lambda to read website targets
+        targets_table.grant_read_data(fn)
     
         #https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.aws_lambda/Version.html#aws_cdk.aws_lambda.Version
         #create a version of the current lambda

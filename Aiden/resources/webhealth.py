@@ -3,13 +3,36 @@ import constants
 import urllib.request
 import urllib.error
 import time
+import boto3
+import os
+
+def get_target():
+    table_name=os.environ.get("TARGETS_TABLE_NAME")
+
+    #fallback for local/unit tests
+    if not table_name:
+        return constants.WEBSITES
+    dynamodb = boto3.resource("dynamodb")
+    table = dynamodb.Table(table_name)
+    
+    start_time =time.perf_counter()
+    response = table.scan()
+    read_time= (time.perf_counter() - start_time)*1000
+    print(f"DynamoDB read time :{read_time:.2f}ms")
+
+    return[
+        item["url"]
+        for item in response.get("Items", [])
+        if "url" in item
+    ]
 
 
 def lambda_handler(event, context):
     print(event)
     responses = []
-
-    for website in constants.WEBSITES:
+     
+    websites = get_target()
+    for website in websites:
         availability = 0
         latency = 0
         responseSize = 0
