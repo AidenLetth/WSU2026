@@ -86,7 +86,7 @@ def lambda_handler(event, context):
                         }
                     )
             
-        raise 
+                raise 
         print(
             f"DynamoDB write time :{write_time:.2f}ms"      
         )
