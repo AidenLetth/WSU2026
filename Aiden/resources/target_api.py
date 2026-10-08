@@ -25,8 +25,6 @@ def create_response(status_code, body):
 def lambda_handler(event, context):
     print(event)
     table = get_table()
-    # Scan the DynamoDB table to get all items
-    response = table.scan()
     method = event.get("httpMethod","")
     #target_id 
     path_parameters = event.get("pathParameters") or {}
@@ -165,7 +163,7 @@ def lambda_handler(event, context):
         name = body.get("name")
         url = body.get("url")
 
-        if not name and not url:
+        if not name or not url:
             return create_response(
                 400,
                 {
@@ -223,7 +221,8 @@ def lambda_handler(event, context):
     if method == "DELETE" and target_id:
             start_time = time.perf_counter()
             response = table.delete_item(
-                Key={"target_id": target_id}
+                Key={"target_id": target_id},
+                ReturnValues="ALL_OLD"
             )
             write_time = (time.perf_counter() - start_time)*1000
 
