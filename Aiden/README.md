@@ -1,42 +1,30 @@
 # Aiden Web Health Monitoring
+## Project Overview
+Aiden Web Health Monitoring is an AWS CDK project that monitors the availability and performance of multiple websites.
 
-Aiden Web Health Monitoring is an AWS CDK project that monitors the health and performance of multiple websites.
+The project uses AWS Lambda to crawl website targets, Amazon DynamoDB to store the target list, Amazon CloudWatch to monitor website and Lambda operational health, and Amazon API Gateway to provide a public REST CRUD interface for managing crawler targets.
 
-The application uses AWS Lambda to send real HTTP requests to each configured website, collect website health metrics, publish the metrics to Amazon CloudWatch, display them on a CloudWatch Dashboard, and evaluate CloudWatch Alarms.
+The project also uses AWS CodePipeline to automate testing and deployment across multiple stages.
+
 
 ## Project Objectives
 
 - Monitor multiple websites automatically.
-- Collect real Availability values.
-- Measure real Latency values.
-- Measure real Response Size values.
+- Measure website Availability, Latency, and Response Size.
 - Publish custom metrics to Amazon CloudWatch.
-- Display website health data on a CloudWatch Dashboard.
-- Configure CloudWatch Alarms for abnormal metric values.
-- Use Amazon SNS for alarm notifications.
-- Log alarm notifications in Amazon DynamoDB.
-- Maintain project documentation and the GitHub Project board.
+- Monitor Lambda Invocations, Duration, and Errors.
+- Trigger CloudWatch alarms when abnormal behaviour is detected.
+- Send alarm notifications using Amazon SNS.
+- Store alarm notification information in DynamoDB.
+- Store crawler target websites in DynamoDB.
+- Manage crawler targets through a public REST API.
+- Implement Create, Read, Update, and Delete operations.
+- Measure DynamoDB read and write time.
+- Automate testing using unit, functional, and integration tests.
+- Deploy through multiple CI/CD stages.
+- Use Lambda versions, aliases, canary deployment, and automatic rollback.
 
 
-## Monitored Websites
-
-1. https://www.ralphlauren.com.au
-2. https://www.google.com
-3. https://www.westernsydney.edu.au
-
-The website list is defined in resources/constants.py.
-
-## Metrics
-
-| Metric | Description | Unit / Value
-| ----------- | ----------- | -----------
-| Availability | Shows whether a website request succeeds | 1 = available, 0 = unavailable
-| Latency | Measures how long the website request takes | Seconds
-| Status Code | Measures the amount of response data returned by the website | Bytes
-
-The project monitors:
-
-**3 websites × 3 metrics = 9 metric dimensions**
 
 ## Project Structure
 
@@ -44,289 +32,303 @@ The project monitors:
 Aiden/
 ├── aiden/
 │   ├── __init__.py
-│   └── aiden_stack.py
+│   ├── aiden_stack.py
+│   ├── pipeline_stack.py
+│   └── pipeline_stage.py
+│
 ├── resources/
 │   ├── alarm.py
 │   ├── constants.py
 │   ├── CWdata.py
+│   ├── target_api.py
 │   └── webhealth.py
+│
+├── tests/
+│   ├── unit/
+│   │   ├── __init__.py
+│   │   ├── test_aiden_stack.py
+│   │   ├── test_target_api_unit.py
+│   │   └── test_wh_unit.py
+│   │
+│   ├── functional/
+│   │   ├── __init__.py
+│   │   ├── test_target_api_functional.py
+│   │   └── test_wh_functional.py
+│   │
+│   └── integration/
+│       ├── __init__.py
+│       ├── test_target_api_integration.py
+│       └── test_wh_integration.py
+│
 ├── app.py
 ├── README.md
 ├── requirements.txt
+├── requirements-dev.txt
 └── cdk.json
 ```
 
 ## Architecture
 
 ```text
-Amazon EventBridge
-        |
-        | Scheduled trigger
-        v
-AWS Lambda - Web Health
-        |
-        | HTTP requests
-        v
-Monitored Websites
-        |
-        | Availability / Latency / Response Size
-        v
-Amazon CloudWatch
-     /           \
-Dashboard       Alarms
-                   |
-                   v
-              Amazon SNS
-              /        \
-         Email       Alarm Logger
-                         |
-                         v
-                    DynamoDB
+                         User
+                          |
+                          v
+                  Amazon API Gateway
+                          |
+                          v
+                     CRUD Lambda
+                          |
+                          v
+                DynamoDB Targets Table
+                          |
+                          v
+                  Web Crawler Lambda
+                          |
+                          v
+                    Target Websites
+                          |
+                          v
+                  Amazon CloudWatch
+                  /              \
+          Dashboard              Alarms
+                                   |
+                                   v
+                              Amazon SNS
+                              /          \
+                           Email      Alarm Logger
+                                         |
+                                         v
+                                     DynamoDB
+
+
+GitHub Repository
+       |
+       v
+AWS CodePipeline
+       |
+       v
+      Synth
+       |
+       v
+Unit Test Blocker
+       |
+       v
+Unit Test Stage
+       |
+       v
+Functional Test Blocker
+       |
+       v
+Functional Test Stage
+       |
+       v
+Integration Test Blocker
+       |
+       v
+Integration Test Stage
+       |
+       v
+Manual Production Approval
+       |
+       v
+Production Stage
+       |
+       v
+Lambda Version
+       |
+       v
+Live Alias
+       |
+       v
+CodeDeploy Canary Deployment
+       |
+       +-------------------------------+
+       |                               |
+    Healthy                          Alarm
+       |                               |
+       v                               v
+Complete Deployment           Automatic Rollback
+
 ```
 
 ## Main Components
 
 ### AWS CDK
 
-AWS CDK is used to define and deploy the AWS infrastructure as code.
+AWS CDK is used to define and deploy the project infrastructure as code.
 
-The main stack is:
-
-`AidenStack`
-
-The stack creates and configures the main AWS resources used by the project.
+The main application stack is `AidenStack`, while `pipeline_stack.py` and `pipeline_stage.py` manage the CI/CD pipeline and deployment stages.
 
 ### AWS Lambda
 
-The Web Health Lambda function is defined in:
+The project uses three main Lambda functions:
 
-`resources/webhealth.py`
-
-It loops through the configured websites and performs a real HTTP request for each website.
-
-For each request, the function collects:
-
-- Availability
-- Latency
-- Response Size
-
-### Amazon EventBridge
-
-EventBridge automatically triggers the Web Health Lambda on a schedule.
-
-The current monitoring schedule is:
-
-`Every 5 minutes`
-
-### Amazon CloudWatch
-
-CloudWatch is used to:
-
-- Store custom Web Health metrics.
-- Display metrics on `WebHealthDashboard`.
-- Evaluate metric thresholds using CloudWatch Alarms.
-- Store Lambda execution logs.
-
-### Amazon SNS
-
-Amazon SNS is used to publish notifications when CloudWatch Alarm thresholds are breached.
-
-SNS can notify subscribers such as an email subscription and can also trigger the alarm logging workflow.
+- `webhealth.py` monitors website targets.
+- `target_api.py` handles CRUD operations for crawler targets.
+- `alarm.py` stores CloudWatch alarm information in DynamoDB.
 
 ### Amazon DynamoDB
 
-DynamoDB is used to store alarm notification information so that alarm events can be reviewed later.
+DynamoDB is used for two purposes:
 
----
+- Store crawler website targets.
+- Store alarm notification records.
 
-## Real Website Health Collection
+The crawler reads the target list from DynamoDB instead of using a permanently hard-coded website list.
 
-The Web Health Lambda sends an HTTP request to each configured website.
-This produces real metric values for each monitoring run.
+### Amazon API Gateway
 
----
+API Gateway provides a public REST API for managing crawler targets.
 
-## CloudWatch Metric Publishing
+| Method | Endpoint | Operation |
+| --- | --- | --- |
+| POST | `/targets` | Create target |
+| GET | `/targets` | Read all targets |
+| GET | `/targets/{target_id}` | Read one target |
+| PUT | `/targets/{target_id}` | Update target |
+| DELETE | `/targets/{target_id}` | Delete target |
 
-Metric publishing is handled by:
+DynamoDB read and write time is also measured and returned in milliseconds.
 
-`resources/CWdata.py`
+### Amazon CloudWatch
 
-Each website is sent to CloudWatch as an individual `Website` dimension.
-The custom CloudWatch namespace is:
+CloudWatch is used for website monitoring and Lambda operational monitoring.
 
-`Aiden`
-
----
-
-## CloudWatch Dashboard
-
-The project creates a CloudWatch Dashboard named:
-
-`WebHealthDashboard`
-
-The dashboard contains one graph for each monitored website.
-
-Each graph displays:
+Website metrics:
 
 - Availability
 - Latency
 - Response Size
 
-This allows the health of all monitored websites to be reviewed from a single dashboard.
+Lambda metrics:
+
+- Invocations
+- Duration
+- Errors
+
+CloudWatch alarms are used to detect unhealthy behaviour.
+
+### Amazon SNS
+
+SNS sends notifications when CloudWatch alarms are triggered.
+
+It can send email notifications and invoke the Alarm Logger Lambda.
 
 ---
 
-## CloudWatch Alarms
+## CI/CD Pipeline
 
-CloudWatch Alarms evaluate the website metrics against configured thresholds.
-
-The project includes alarms for:
-
-- Availability
-- Latency
-- Response Size
-
-Alarm thresholds should be reviewed after observing real website values because real latency and response size can vary between websites.
-
----
-
-## SNS Alarm Notifications
-
-When a CloudWatch Alarm enters the `ALARM` state, Amazon SNS is used to publish an alarm notification.
-
-The notification workflow is:
+AWS CodePipeline automates testing and deployment.
 
 ```text
-CloudWatch Alarm
-        |
-        v
-Amazon SNS
-     /      \
- Email    Alarm Logger
+GitHub
+ |
+ v
+Synth
+ |
+ v
+Unit Test Blocker
+ |
+ v
+UnitTestStage
+ |
+ v
+Functional Test Blocker
+ |
+ v
+FunctionalTestStage
+ |
+ v
+Integration Test Blocker
+ |
+ v
+IntegrationTestStage
+ |
+ v
+Manual Production Approval
+ |
+ v
+ProdStage
 ```
 
-Email subscriptions must be confirmed before notification emails can be received.
+Each test blocker must pass before the next stage can continue.
+
+Production deployment requires manual approval.
 
 ---
 
-## DynamoDB Alarm Logging
+## Canary Deployment and Rollback
 
-Alarm notifications can be logged in DynamoDB through the alarm logging Lambda.
+The Web Crawler Lambda uses a published Lambda version and a `Live` alias.
 
-The alarm log can contain information such as:
+AWS CodeDeploy uses a canary deployment strategy:
 
-- Alarm name
-- Alarm state
-- Alarm reason
-- Timestamp
-- Alarm identifier
+`CANARY_10_PERCENT_5_MINUTES`
 
-This provides a historical record of alarm events.
+This sends 10% of traffic to the new Lambda version for five minutes.
+
+CloudWatch Error and Duration alarms monitor the deployment.
+
+If the deployment fails or an alarm is triggered, CodeDeploy is configured to automatically rollback to the previous Lambda version.
+
+---
+
+## Automated Testing
+
+The project uses PyTest for automated testing.
+
+Current result:
+
+```text
+13 Unit Tests
+9 Functional Tests
+3 Integration Tests
+
+25 Tests Passed
+```
+
+The Applied Project adds:
+
+- 2 unit tests
+- 1 functional test
+- 1 integration test
+
+Run all tests using:
+
+```bash
+python -m pytest
+```
 
 ---
 
 ## Deployment
 
-Activate the Python virtual environment:
-
-```bash
-source .venv/bin/activate
-```
-
-Install dependencies if required:
-
-```bash
-pip install -r requirements.txt
-```
-
-Check the CDK template:
+Validate the CDK application:
 
 ```bash
 cdk synth
 ```
 
-Deploy the stack:
+Deploy the pipeline:
 
 ```bash
-cdk deploy
+cdk deploy AidenPipelineStack
 ```
+
+After the pipeline is deployed, code changes pushed to GitHub automatically start the testing and deployment process.
 
 ---
 
-## Testing
+## Current Status
 
-### Test the Web Health Lambda
+The Web Health monitoring system, CloudWatch monitoring, SNS notifications, DynamoDB alarm logging, multi-stage CI/CD pipeline, Lambda canary deployment, automatic rollback, public CRUD API, and DynamoDB crawler target management have been implemented.
 
-1. Open AWS Lambda.
-2. Select the Web Health Lambda function.
-3. Create or select a test event.
-4. Run the test.
-5. Check the execution result and CloudWatch Logs.
+The complete automated test suite currently passes:
 
-A successful run should process all three websites.
-
-Example output:
-
-```text
-Website: https://www.ralphlauren.com | Availability: 1 | Latency: ... | Response Size: ... bytes
-Website: https://www.google.com | Availability: 1 | Latency: ... | Response Size: ... bytes
-Website: https://www.westernsydney.edu.au | Availability: 1 | Latency: ... | Response Size: ... bytes
-```
-
-### Verify CloudWatch Metrics
-
-Open:
-
-`CloudWatch -> Metrics -> Aiden`
-
-Check that each website has values for:
-
-- Availability
-- Latency
-- Response Size
-
-### Verify the Dashboard
-
-Open:
-
-`CloudWatch -> Dashboards -> WebHealthDashboard`
-
-Confirm that all three website graphs update with current values.
-
-### Verify Alarms
-
-Open:
-
-`CloudWatch -> Alarms`
-
-Confirm that the alarm states match the current metric values and thresholds.
-
-### Verify SNS
-
-Trigger a threshold breach and confirm that the SNS notification is delivered to the configured subscriber.
-
-### Verify DynamoDB
-
-After an alarm notification is generated, open the DynamoDB alarm log table and confirm that the alarm record has been stored.
-
----
-
-## GitHub Project Board
-
-The project board is organised into five workflow columns:
-
-1. User Stories / Backlog
-2. Features
-3. In Progress
-4. In Review
-5. Done
-
-The board is updated to reflect the current implementation, testing, and verification status of the Web Health project.
+`25 passed`
 
 ---
 
 ## Author
 
 **Aiden**
-
