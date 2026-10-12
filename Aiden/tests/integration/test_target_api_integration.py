@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "resources"))
-import target_api 
+import target_api  # type: ignore
 
 class FakeTable:
     def __init__(self):

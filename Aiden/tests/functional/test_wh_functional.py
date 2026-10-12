@@ -1,15 +1,15 @@
+#8 functional tests: verify the crawler behaviour end-to-end at the application-function level, heck that a monitoring run produces the expected metrics for successful and failed websites and that multiple targets are handled correctly
+#1.Handler returns complete website information, 2.Handler processes multiple websites
+#3. One failed website does not stop the next website, 4. HTTP 403 is handled correctly
+#5.Three metrics are sent for every website, 6.Correct metric names are sent to CloudWatch
+#7.HTTP request uses WebHealth User-Agent, 8.Returned website order matches configured website order
 import sys
 from pathlib import Path
 import io
 import urllib.error
+sys.path.insert(0,str(Path(__file__).resolve().parents[2] / "resources"))
 
-# Allow Python to find resources/webhealth.py
-sys.path.insert(
-    0,
-    str(Path(__file__).resolve().parents[2] / "resources")
-)
-
-import webhealth  # type: ignore
+import webhealth   # type: ignore
 
 
 class FakeResponse:

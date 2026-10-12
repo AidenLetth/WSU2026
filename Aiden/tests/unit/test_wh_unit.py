@@ -1,16 +1,13 @@
+#10 unit tests:isolate the crawler logic by mocking HTTP requests, time and CloudWatch publishing.
+# 1.Successful request, 2.Response Size, 3.Latency calculation, 4.Correct website passed to CloudWatch
+#5.All three metrics are published, 6.Multiple websites, 7.HTTP error handling, 8.General exception handling
+#9.HTTP timeout, 10.User-Agent header
 import sys
 from pathlib import Path
 import io
 import urllib.error
-
-# Allow Python to find resources/webhealth.py
-sys.path.insert(
-    0,
-    str(Path(__file__).resolve().parents[2] / "resources")
-)
-
+sys.path.insert(0,str(Path(__file__).resolve().parents[2] / "resources"))
 import webhealth  # type: ignore
-
 
 # Fake website response
 class FakeResponse:
@@ -27,7 +24,7 @@ class FakeResponse:
         pass
 
 
-# Helper: stop tests from sending real data to CloudWatch
+# stop tests from sending real data to CloudWatch
 def mock_cloudwatch(monkeypatch):
     monkeypatch.setattr(
         webhealth.cw,
